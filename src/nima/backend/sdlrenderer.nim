@@ -28,6 +28,27 @@ type
 
   SdlGamepads = Table[SDL_JoystickID, SDL_Gamepad]
 
+  SdlRendererRuntime = ref object
+    window: SDL_Window
+    renderer: SDL_Renderer
+    engine: Engine
+    textureCache: TextureCache
+    textCache: TextTextureCache
+    glyphCache: GlyphTextureCache
+    imageLoader: SdlImageState
+    ttf: SdlTtfState
+    sdlAudio: SdlAudioState
+    gamepads: SdlGamepads
+    lastTicks: uint64
+    vsync: bool
+
+when defined(emscripten):
+  proc emscriptenSetMainLoop(callback: proc() {.cdecl.}, fps: cint,
+                             simulateInfiniteLoop: bool) {.importc: "emscripten_set_main_loop".}
+  proc emscriptenCancelMainLoop() {.importc: "emscripten_cancel_main_loop".}
+
+  var emscriptenRuntime: SdlRendererRuntime
+
 proc sdlError(message: string): ref SdlBackendError =
   let detail = $SDL_GetError()
   if detail.len > 0:
@@ -662,6 +683,56 @@ proc renderFrame(renderer: SDL_Renderer, engine: var Engine, textureCache: var T
 
   discard SDL_RenderPresent(renderer)
 
+proc stepFrame(runtime: SdlRendererRuntime) =
+  runtime.engine.processEvents(runtime.window, runtime.renderer, runtime.gamepads)
+  let now = SDL_GetTicks()
+  var dt = (now - runtime.lastTicks).float32 / 1000'f32
+  runtime.lastTicks = now
+  if dt <= 0'f32:
+    dt = 1'f32 / 60'f32
+  elif dt > 0.25'f32:
+    dt = 0.25'f32
+
+  runtime.engine.stepFrame(dt)
+  runtime.sdlAudio.syncAudio(runtime.engine.audio)
+  renderFrame(runtime.renderer, runtime.engine, runtime.textureCache,
+              runtime.textCache, runtime.glyphCache, runtime.imageLoader,
+              runtime.ttf)
+
+  when not defined(emscripten):
+    if not runtime.vsync:
+      SDL_Delay(1)
+
+when defined(emscripten):
+  proc emscriptenFrame() {.cdecl.} =
+    if emscriptenRuntime.isNil:
+      emscriptenCancelMainLoop()
+      return
+    if emscriptenRuntime.engine.exitRequested:
+      emscriptenCancelMainLoop()
+      return
+    discard withEngineScope(emscriptenRuntime.engine, proc(): bool =
+      emscriptenRuntime.stepFrame()
+      true
+    )
+
+proc shutdown(runtime: SdlRendererRuntime) =
+  for _, texture in runtime.textureCache.mpairs:
+    if not texture.isNil:
+      SDL_DestroyTexture(texture)
+  for _, texture in runtime.textCache.mpairs:
+    if not texture.texture.isNil:
+      SDL_DestroyTexture(texture.texture)
+  for _, texture in runtime.glyphCache.mpairs:
+    if not texture.texture.isNil:
+      SDL_DestroyTexture(texture.texture)
+  runtime.imageLoader.shutdown()
+  runtime.ttf.shutdown()
+  runtime.gamepads.closeGamepads(runtime.engine.input)
+  runtime.sdlAudio.shutdown()
+  when defined(nimaUseNativeImgui):
+    nativeimgui.shutdownNativeImgui()
+
 proc runSdl*(title: string, size: IVec2, viewSize: Vec2, presentation: SdlPresentation,
              initialScene: Scene, vsync, resizable, fullscreen, cursorVisible: bool) =
   checkSdl(SDL_Init(SDL_INIT_VIDEO or SDL_INIT_EVENTS or SDL_INIT_GAMEPAD), "SDL_Init failed")
@@ -700,62 +771,44 @@ proc runSdl*(title: string, size: IVec2, viewSize: Vec2, presentation: SdlPresen
     when defined(nimaUseNativeImgui):
       nativeimgui.initNativeImguiForSdlRenderer(window, renderer, title)
 
-    var engine = initEngine(initialScene, viewSize)
-    engine.updateMetrics(window)
-    var textureCache = initTable[uint32, SDL_Texture]()
-    var textCache = initTable[string, TextTexture]()
-    var glyphCache = initTable[string, GlyphTexture]()
-    var imageLoader = initSdlImageState()
-    var ttf = initSdlTtfState()
-    var sdlAudio = initSdlAudioState()
-    var gamepads = initTable[SDL_JoystickID, SDL_Gamepad]()
-    gamepads.openExistingGamepads(engine.input)
+    let runtime = SdlRendererRuntime(
+      window: window,
+      renderer: renderer,
+      engine: initEngine(initialScene, viewSize),
+      textureCache: initTable[uint32, SDL_Texture](),
+      textCache: initTable[string, TextTexture](),
+      glyphCache: initTable[string, GlyphTexture](),
+      imageLoader: initSdlImageState(),
+      ttf: initSdlTtfState(),
+      sdlAudio: initSdlAudioState(),
+      gamepads: initTable[SDL_JoystickID, SDL_Gamepad](),
+      lastTicks: SDL_GetTicks(),
+      vsync: vsync
+    )
+    runtime.engine.updateMetrics(window)
+    runtime.gamepads.openExistingGamepads(runtime.engine.input)
 
-    var lastTicks = SDL_GetTicks()
     try:
-      discard withEngineScope(engine, proc(): bool =
-        while not engine.exitRequested:
-          engine.processEvents(window, renderer, gamepads)
-          let now = SDL_GetTicks()
-          var dt = (now - lastTicks).float32 / 1000'f32
-          lastTicks = now
-          if dt <= 0'f32:
-            dt = 1'f32 / 60'f32
-          elif dt > 0.25'f32:
-            dt = 0.25'f32
-
-          engine.stepFrame(dt)
-          sdlAudio.syncAudio(engine.audio)
-          renderFrame(renderer, engine, textureCache, textCache, glyphCache,
-                      imageLoader, ttf)
-
-          if not vsync:
-            SDL_Delay(1)
+      discard withEngineScope(runtime.engine, proc(): bool =
+        when defined(emscripten):
+          emscriptenRuntime = runtime
+          emscriptenSetMainLoop(emscriptenFrame, 0, true)
+        else:
+          while not runtime.engine.exitRequested:
+            runtime.stepFrame()
         true
       )
     finally:
-      for _, texture in textureCache.mpairs:
-        if not texture.isNil:
-          SDL_DestroyTexture(texture)
-      for _, texture in textCache.mpairs:
-        if not texture.texture.isNil:
-          SDL_DestroyTexture(texture.texture)
-      for _, texture in glyphCache.mpairs:
-        if not texture.texture.isNil:
-          SDL_DestroyTexture(texture.texture)
-      imageLoader.shutdown()
-      ttf.shutdown()
-      gamepads.closeGamepads(engine.input)
-      sdlAudio.shutdown()
-      when defined(nimaUseNativeImgui):
-        nativeimgui.shutdownNativeImgui()
+      when not defined(emscripten):
+        runtime.shutdown()
   finally:
-    if not window.isNil:
-      discard SDL_StopTextInput(window)
-    if not renderer.isNil:
-      SDL_DestroyRenderer(renderer)
-    if not window.isNil:
-      SDL_DestroyWindow(window)
-    SDL_Quit()
+    when not defined(emscripten):
+      if not window.isNil:
+        discard SDL_StopTextInput(window)
+      if not renderer.isNil:
+        SDL_DestroyRenderer(renderer)
+      if not window.isNil:
+        SDL_DestroyWindow(window)
+      SDL_Quit()
 
 proc sdlLinked*(): bool = true

@@ -15,7 +15,7 @@ Current scope:
 - Texture, font, audio, atlas, prefab, map, tween, particle, light, physics,
   diagnostics, and hot-reload slices.
 - Built-in immediate debug UI plus optional native Dear ImGui integration.
-- SDL_Renderer bootstrap backend and SDL_GPU backend.
+- SDL_Renderer bootstrap backend, SDL_GPU backend, and Emscripten web builds.
 
 ## File Structure
 
@@ -37,11 +37,15 @@ tests/
   *.nim                    Unit and backend smoke tests.
 tools/
   compile_shaders.nim      Optional SDL_shadercross shader build helper.
+  platform_examples.nim    Cross-target example build/package helper.
+  build_sdl3_emscripten.sh SDL3 static-library builder for web.
+  linux.Dockerfile         Optional Linux example builder from non-Linux hosts.
+.dockerignore              Keeps Docker Linux builder context small.
 ```
 
 ## Backends
 
-Nima has three build modes:
+Nima has these main build modes:
 
 ```sh
 nim c -r examples/breakout.nim
@@ -130,6 +134,47 @@ nimble sdlExamples
 nimble sdlGpuExamples
 nimble nativeImguiSmoke
 ```
+
+Build browser examples with Emscripten:
+
+```sh
+nimble sdl3Emscripten
+export SDL3_EMSCRIPTEN_PREFIX=<sdl3-emscripten-prefix>
+NIMA_EXAMPLE=breakout nimble webExample
+nimble webExamples
+python3 -m http.server 8000 -d build/web/breakout
+```
+
+Cross-compile Windows examples with MinGW:
+
+```sh
+NIMA_EXAMPLE=breakout nimble windowsExample
+nimble windowsExamples
+```
+
+Windows packages are emitted under `build/windows/<example>/`. Put `SDL3.dll`
+next to the executable before running on Windows, or set
+`SDL3_WINDOWS_DLL_DIR=<sdl3-windows-dll-dir>` before the package task to copy
+known DLLs.
+
+Build Linux examples on a Linux host:
+
+```sh
+nimble linuxExamples
+```
+
+Build Linux examples from a non-Linux host with Docker:
+
+```sh
+NIMA_TARGET=linux NIMA_EXAMPLE=breakout NIMA_PLATFORM_ARGS=--package nimble platformExamples
+nimble linuxExamples
+NIMA_TARGET=linux NIMA_PLATFORM_ARGS=--check-tools nimble platformExamples
+```
+
+Linux packages are emitted under `build/linux/<example>/`. Install SDL3 on the
+target Linux machine or set `SDL3_LINUX_LIB_DIR=<sdl3-linux-lib-dir>` before
+packaging to copy local SDL3 shared libraries. Docker builds use the Docker
+platform architecture by default.
 
 Run tests:
 

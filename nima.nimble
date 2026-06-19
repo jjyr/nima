@@ -8,6 +8,8 @@ requires "nim >= 2.0.4"
 requires "sdl3 >= 1.1.0"
 requires "stb_image >= 2.5"
 
+import std/os
+
 task test, "Run unit tests":
   exec "nim c -r tests/all.nim"
 
@@ -33,6 +35,16 @@ const exampleNames = [
   "imgui_cjk"
 ]
 
+proc requireCommand(name: string) =
+  if findExe(name).len == 0:
+    quit "Required command not found: " & name, 1
+
+proc platformToolCommand(target, examples: string, extra = ""): string =
+  result = "nim r --nimcache:nimcache/platform_examples_tool tools/platform_examples.nim -- --target:" &
+    target & " --example:" & examples
+  if extra.len > 0:
+    result.add " " & extra
+
 task examples, "Build representative examples":
   for name in exampleNames:
     exec "nim c --nimcache:nimcache/examples_" & name & " examples/" & name & ".nim"
@@ -49,6 +61,34 @@ task sdlGpuSmoke, "Build SDL_GPU smoke test":
 task sdlGpuExamples, "Build representative examples with SDL_GPU backend":
   for name in exampleNames:
     exec "nim c --nimcache:nimcache/sdl_gpu_" & name & " -d:nimaUseSdlGpu examples/" & name & ".nim"
+
+task webExample, "Build one web example. Use NIMA_EXAMPLE=name, default breakout":
+  let name = getEnv("NIMA_EXAMPLE", "breakout")
+  exec platformToolCommand("web", name)
+
+task webExamples, "Build browser versions of examples with Emscripten":
+  exec platformToolCommand("web", "all")
+
+task sdl3Emscripten, "Build SDL3 static library for Emscripten into build/sdl3-emscripten-prefix":
+  requireCommand("emcmake")
+  requireCommand("cmake")
+  requireCommand("git")
+  exec "tools/build_sdl3_emscripten.sh"
+
+task windowsExample, "Cross-compile one Windows example. Use NIMA_EXAMPLE=name, default breakout":
+  let name = getEnv("NIMA_EXAMPLE", "breakout")
+  exec platformToolCommand("windows", name, "--package")
+
+task windowsExamples, "Cross-compile Windows examples with MinGW":
+  exec platformToolCommand("windows", "all", "--package")
+
+task linuxExamples, "Build Linux examples on a Linux host":
+  exec platformToolCommand("linux", "all", "--package")
+
+task platformExamples, "Build examples for NIMA_TARGET=headless|sdl|sdlgpu|web|windows|linux and optional NIMA_EXAMPLE":
+  let target = getEnv("NIMA_TARGET", "headless")
+  let examples = getEnv("NIMA_EXAMPLE", "all")
+  exec platformToolCommand(target, examples, getEnv("NIMA_PLATFORM_ARGS"))
 
 task nativeImguiSmoke, "Build native Dear ImGui bridge smoke test":
   exec "nim c --nimcache:nimcache/native_imgui -d:nimaUseNativeImgui tests/native_imgui_compile.nim"

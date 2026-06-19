@@ -32,6 +32,18 @@ Local validation state:
 - Native Dear ImGui is opt-in through `-d:nimaUseNativeImgui`. It vendors
   CImGui/Dear ImGui source and compiles C++ into the game executable; it does
   not add a separate Dear ImGui runtime library.
+- Web examples build with Emscripten and a separately built SDL3 static
+  library. The local `nimble webExamples` check emits 18 web bundles; `hotreload`
+  is excluded from web by design.
+- Windows examples cross compile with MinGW. The local `nimble windowsExamples`
+  check emits 19 PE32+ GUI executables under `build/windows/<example>/`.
+- Linux example builds are implemented for Linux hosts and through
+  `tools/linux.Dockerfile` from non-Linux hosts. The local
+  `nimble linuxExamples` check emits 19 ELF 64-bit Linux aarch64 binaries under
+  `build/linux/<example>/` on the current Apple Silicon macOS host.
+- A Linux Docker dummy-video runtime smoke now runs `tests/sdl_smoke.nim` with
+  `SDL_VIDEODRIVER=dummy` and `SDL_AUDIODRIVER=dummy`, confirming the container
+  can load SDL3 through the `libSDL3.so` name expected by the Nim binding.
 
 ## Package Baseline
 
@@ -41,7 +53,7 @@ Target package metadata:
 # nima.nimble
 version       = "0.1.0"
 author        = "TBD"
-description   = "A Nim-native 2D game engine inspired by Roast2D"
+description   = "A Nim-native 2D game engine inspired by raylib and fau"
 license       = "MIT"
 srcDir        = "src"
 
@@ -149,7 +161,10 @@ Minimal `config.nims`, modeled after Fau's platform linker choices:
 --gc:arc
 
 when defined(Windows):
+  switch("passL", "-static")
   switch("passL", "-static-libstdc++ -static-libgcc")
+  when not defined(nimaWindowsConsole):
+    switch("passL", "-mwindows")
 
 when defined(MacOSX):
   switch("clang.linkerexe", "g++")
@@ -186,16 +201,21 @@ const builds = [
 Build command pattern:
 
 ```sh
-nim --cpu:amd64 --os:windows --app:gui \
+nim --cpu:amd64 --os:windows --app:console \
   --gcc.exe:x86_64-w64-mingw32-gcc \
   --gcc.linkerexe:x86_64-w64-mingw32-g++ \
-  -d:danger -o:build/mygame-win64.exe c src/mygame.nim
+  -d:nimaUseSdl -o:build/windows/mygame/mygame.exe c src/mygame.nim
 ```
+
+`config.nims` adds `-mwindows` unless `-d:nimaWindowsConsole` is set. This
+keeps Windows examples as GUI-subsystem executables while avoiding macOS `.app`
+bundles during cross compilation. It also passes `-static` and the usual MinGW
+static runtime flags so `libwinpthread-1.dll` is not required.
 
 Release bundle must include:
 
 ```text
-mygame-win64.exe
+mygame.exe
 SDL3.dll
 SDL3_ttf.dll        # optional, required only for Text.withFont real glyphs
 SDL3_image.dll      # optional, required only for image fallback formats
@@ -205,6 +225,71 @@ assets/
 
 Use the SDL3 DLL matching the compiler/runtime architecture. Do not assume the
 Nim `sdl3` package ships native DLLs.
+
+Nima's helper copies runtime DLLs only when `SDL3_WINDOWS_DLL_DIR` is set:
+
+```sh
+SDL3_WINDOWS_DLL_DIR=<sdl3-windows-dll-dir> NIMA_EXAMPLE=breakout nimble windowsExample
+```
+
+## Web Packaging
+
+Web builds use Emscripten and the SDL_Renderer backend. Build SDL3 for
+Emscripten outside this repository, then set `SDL3_EMSCRIPTEN_PREFIX` to the
+install prefix that contains `lib/libSDL3.a`. `config.nims` maps
+`-d:emscripten` to `emcc`, enables `nimaUseSdl`, attaches
+`tools/web_shell.html`, links that SDL3 static library, and preloads the
+repository `assets/` directory into the browser virtual filesystem.
+Nima disables Nim threads for web builds so normal static hosting works without
+SharedArrayBuffer/cross-origin-isolation headers.
+
+Build one example:
+
+```sh
+nimble sdl3Emscripten
+export SDL3_EMSCRIPTEN_PREFIX=<sdl3-emscripten-prefix>
+NIMA_EXAMPLE=breakout nimble webExample
+```
+
+Build all web-supported examples:
+
+```sh
+nimble sdl3Emscripten
+export SDL3_EMSCRIPTEN_PREFIX=<sdl3-emscripten-prefix>
+nimble webExamples
+```
+
+`nimble sdl3Emscripten` runs `tools/build_sdl3_emscripten.sh`. Override the
+source, build, install prefix, repository, or ref with `SDL3_SRC`,
+`SDL3_EMSCRIPTEN_BUILD_DIR`, `SDL3_EMSCRIPTEN_PREFIX`, `SDL3_REPO`, and
+`SDL3_REF`.
+
+On Homebrew Emscripten installs, `clang` and `wasm-ld` may live in different
+formula directories. `tools/platform_examples.nim` and
+`tools/build_sdl3_emscripten.sh` create a repo-local LLVM shim under
+`build/emscripten/llvm-root` when needed.
+
+Output layout:
+
+```text
+build/web/<example>/index.html
+build/web/<example>/index.js
+build/web/<example>/index.wasm
+build/web/<example>/index.data
+```
+
+Serve with a static file server:
+
+```sh
+python3 -m http.server 8000 -d build/web/breakout
+```
+
+Current web exclusions:
+
+- `hotreload`: browser builds do not support the desktop dynamic-library reload
+  flow.
+- `nimaUseSdlGpu`: SDL_GPU web support needs a separate shader/backend pass.
+- `nimaUseNativeImgui`: the native Dear ImGui bridge is desktop-only for now.
 
 ## Dynamic Linking
 
@@ -229,9 +314,47 @@ Distribution path:
   real font rendering, `SDL3_image.dll` when using image fallback formats, and
   `SDL3_mixer.dll` when using non-WAV audio.
 - Linux: use system SDL3 for development; release via AppImage/Flatpak or
-  bundled `.so` files if needed. Include `libSDL3_ttf.so.0` only when font
-  rendering is required. Include `libSDL3_image.so.0` and `libSDL3_mixer.so.0`
-  only when those optional runtime paths are required.
+  bundled `.so` files if needed. The Nim `sdl3` binding loads `libSDL3.so`, so
+  Linux targets need either an SDL3 development package installed, an
+  AppImage/Flatpak runtime that exposes that loader name, or a bundled
+  `libSDL3.so` symlink next to the binary. Include `libSDL3_ttf.so.0` only when
+  font rendering is required. Include `libSDL3_image.so.0` and
+  `libSDL3_mixer.so.0` only when those optional runtime paths are required.
+- Web: serve the generated `.html`, `.js`, `.wasm`, and `.data` files together
+  from the same directory.
+
+## Linux Docker Builder
+
+`tools/linux.Dockerfile` provides the non-Linux host builder used by
+`nimble linuxExamples`.
+
+Important details:
+
+- The image is based on `nimlang/nim:2.2.10`.
+- `/opt/nim/bin` is added to `PATH`.
+- Debian `libsdl3-dev` is installed so the image has both the SDL3 runtime and
+  the `libSDL3.so` loader name expected by the Nim `sdl3` binding.
+- `nimble install -dy` runs in the image layer from `nima.nimble`, so the
+  `sdl3` and `stb_image` Nim packages are available before example builds.
+- The source tree is copied into the image with `.dockerignore` excluding
+  `build/`, `nimcache/`, `.git/`, and local binaries.
+- The container writes build output to `/out`; the host tool mounts `/out` from
+  a temporary directory and copies the resulting `linux/<example>/` packages
+  back to the configured output root.
+- Docker builds produce binaries for the Docker platform architecture. On the
+  current Apple Silicon macOS host, default Docker output is Linux aarch64.
+
+Build one packaged Linux example from macOS:
+
+```sh
+NIMA_TARGET=linux NIMA_EXAMPLE=breakout NIMA_PLATFORM_ARGS=--package nimble platformExamples
+```
+
+Build all packaged Linux examples:
+
+```sh
+nimble linuxExamples
+```
 
 ## Compile Commands
 
@@ -282,62 +405,35 @@ compiled shader blobs instead of needing the shader compiler.
 
 ## Nima Package Tasks
 
-Recommended Nimble tasks:
+`nima.nimble` now delegates target-specific example builds to
+`tools/platform_examples.nim`.
 
-```nim
-const exampleNames = [
-  "window_smoke", "shapes", "scene_stack", "imgui_overlay",
-  "diagnostics_overlay", "particles_basic", "light2d_basic", "audio_basic",
-  "physics_basic", "prefab_basic", "atlas_basic", "text_test", "ui_layout",
-  "breakout", "blink", "hex", "imgui_showcase", "imgui_cjk"
-]
+```sh
+nimble examples
+nimble sdlExamples
+nimble sdlGpuExamples
+NIMA_EXAMPLE=breakout nimble webExample
+nimble webExamples
+NIMA_EXAMPLE=breakout nimble windowsExample
+nimble windowsExamples
+nimble linuxExamples
+NIMA_TARGET=linux NIMA_PLATFORM_ARGS=--check-tools nimble platformExamples
+```
 
-task examples, "Build and run examples":
-  for name in exampleNames:
-    exec "nim c --nimcache:nimcache/examples_" & name & " examples/" & name & ".nim"
+`platformExamples` accepts:
 
-task sdlExamples, "Build examples with SDL backend":
-  for name in exampleNames:
-    exec "nim c --nimcache:nimcache/sdl_" & name & " -d:nimaUseSdl examples/" & name & ".nim"
-
-task sdlGpuSmoke, "Build SDL_GPU smoke test":
-  exec "nim c --nimcache:nimcache/sdl_gpu_smoke -d:nimaUseSdlGpu tests/sdl_gpu_smoke.nim"
-  exec "nim c --nimcache:nimcache/sdl_gpu_sprite_smoke -d:nimaUseSdlGpu tests/sdl_gpu_sprite_smoke.nim"
-  exec "nim c --nimcache:nimcache/sdl_gpu_text_smoke -d:nimaUseSdlGpu tests/sdl_gpu_text_smoke.nim"
-
-task sdlGpuExamples, "Build examples with SDL_GPU backend":
-  for name in exampleNames:
-    exec "nim c --nimcache:nimcache/sdl_gpu_" & name & " -d:nimaUseSdlGpu examples/" & name & ".nim"
-
-task hotreloadLib, "Build dynamic hot reload example library":
-  when defined(macosx):
-    exec "nim c --nimcache:nimcache/hotreload_lib --app:lib --out:examples/libhotreload_game.dylib examples/hotreload_game.nim"
-  elif defined(windows):
-    exec "nim c --nimcache:nimcache/hotreload_lib --app:lib --out:examples/hotreload_game.dll examples/hotreload_game.nim"
-  else:
-    exec "nim c --nimcache:nimcache/hotreload_lib --app:lib --out:examples/libhotreload_game.so examples/hotreload_game.nim"
-
-task hotreloadSmoke, "Build hot reload library and run headless smoke":
-  when defined(macosx):
-    exec "nim c --nimcache:nimcache/hotreload_lib --app:lib --out:examples/libhotreload_game.dylib examples/hotreload_game.nim"
-  elif defined(windows):
-    exec "nim c --nimcache:nimcache/hotreload_lib --app:lib --out:examples/hotreload_game.dll examples/hotreload_game.nim"
-  else:
-    exec "nim c --nimcache:nimcache/hotreload_lib --app:lib --out:examples/libhotreload_game.so examples/hotreload_game.nim"
-  exec "nim c --nimcache:nimcache/hotreload_smoke -r tests/hotreload_smoke.nim"
-
-task test, "Run unit tests":
-  exec "nim c -r tests/all.nim"
-
-task shaders, "Compile built-in shaders":
-  exec "nim c --nimcache:nimcache/shaders -r tools/compile_shaders.nim"
+```text
+NIMA_TARGET=headless|sdl|sdlgpu|web|windows|linux
+NIMA_EXAMPLE=<name|comma-separated-list|all>
+NIMA_PLATFORM_ARGS="--run --package --out:<dir> --check-tools"
 ```
 
 CI is intentionally out of scope for the current documentation pass.
 
 ## References
 
-- Fau SDL backend: `/Users/jjy/Workspace/fau/src/fau/backend/sdlcore.nim`
-- Fau project generator Windows build args: `/Users/jjy/Workspace/fau/src/fau/tools/fauproject.nim`
+- Fau SDL backend: `<fau-repo>/src/fau/backend/sdlcore.nim`
+- Fau project generator Windows/web build args:
+  `<fau-repo>/src/fau/tools/fauproject.nim`
 - Nim `sdl3` package: https://github.com/transmutrix/nim-sdl3
 - SDL3 build and migration notes: https://wiki.libsdl.org/SDL3/README-migration

@@ -6,7 +6,7 @@ This file tracks facts still needed before or during implementation.
 
 - Nim compiler is installed: `2.2.10` on macOS arm64.
 - Nimble is installed: `0.22.2`.
-- Fau is cloned locally at `/Users/jjy/Workspace/fau`.
+- Fau is available as a local reference checkout.
 - Nima should not vendor `libsdl-org/SDL` as a submodule.
 - Nimble registry package `sdl3` points to `https://github.com/transmutrix/nim-sdl3`.
 - Nim `sdl3` package version `1.1.0` requires Nim `>= 2.0.4`.
@@ -113,6 +113,37 @@ This file tracks facts still needed before or during implementation.
   expose handle fields as pointer-to-pointer. Nima's SDL_GPU scaffold uses
   narrow local fixed structs for swapchain acquire, render pass target info,
   and blit info.
+- Web build support now follows Fau's Emscripten shape but links SDL3 as a
+  separately built Emscripten static library: `-d:emscripten` selects `emcc`,
+  enables the SDL_Renderer backend, uses `emscripten_set_main_loop`, preloads
+  `assets/`, and emits one HTML/WASM bundle per example through
+  `nimble webExample` or `nimble webExamples`.
+- Web builds are locally verified: `nimble webExamples` emits 18 web-supported
+  example bundles. `hotreload` is excluded from web by design.
+- Web runtime smoke is locally verified for `breakout`: served from
+  `build/web/breakout`, opened through Playwright, page title `Breakout`,
+  console contained only the SDL startup log, and the screenshot showed live
+  Breakout rendering.
+- Emscripten builds use `--threads:off` and a repo-local
+  `build/emscripten/cache-nothreads` cache so generated output can be hosted by
+  a normal static server without SharedArrayBuffer headers.
+- Homebrew Emscripten can provide `clang` and `wasm-ld` from different formula
+  paths. The platform tools create `build/emscripten/llvm-root` as an LLVM shim
+  when needed.
+- Windows cross compile is locally verified with MinGW:
+  `nimble windowsExamples` emits 19 PE32+ GUI executables under
+  `build/windows/<example>/`.
+- Windows output uses `--app:console` plus linker `-mwindows`, because
+  `--app:gui` on macOS creates a macOS `.app` wrapper during cross
+  compilation.
+- Windows linker flags now include `-static`, `-static-libstdc++`, and
+  `-static-libgcc`; verified sample executables do not import
+  `libwinpthread-1.dll`.
+- Linux build support is implemented for Linux hosts and through an optional
+  Docker builder (`tools/linux.Dockerfile`) from non-Linux hosts. Local Docker
+  artifact generation is verified with `nimble linuxExamples`, emitting 19
+  Linux aarch64 example packages under `build/linux/<example>/` on the current
+  Apple Silicon macOS host.
 
 ## Need Before SDL_GPU Feature Parity
 
@@ -150,13 +181,28 @@ This file tracks facts still needed before or during implementation.
 
 ## Need Before Windows Packaging
 
-- Confirm MinGW toolchain availability:
-  `x86_64-w64-mingw32-gcc` and `x86_64-w64-mingw32-g++`.
-- Choose SDL3 Windows dev package version and document where `SDL3.dll` comes
-  from.
-- Decide release bundle layout and whether post-build copy scripts are needed.
+- Choose the preferred SDL3 Windows runtime distribution source and document
+  exactly where `SDL3.dll` comes from for release builds.
+- Validate a generated Windows package on an actual Windows machine with
+  `SDL3.dll` beside the executable.
+- Decide whether to download/cache SDL3 Windows DLLs automatically or keep
+  `SDL3_WINDOWS_DLL_DIR` as an explicit user-provided input.
+
+## Need Before Linux Validation
+
+- Validate a generated Linux SDL_Renderer example on a real Linux desktop with
+  `libSDL3.so` available.
+- Validate optional Linux packaging with `SDL3_LINUX_LIB_DIR`.
+- Validate Vulkan runtime/shader path for `nimaUseSdlGpu`.
+
+## Need Before Additional Web Runtime Validation
+
+- Run more interactive browser smoke checks beyond Breakout, especially
+  `ui_layout`, `imgui_showcase`, and `imgui_cjk`.
+- Validate browser audio unlock with a real user gesture.
+- Validate resize behavior across desktop and mobile browser viewports.
 
 ## Deferred
 
 - CI is intentionally not planned yet.
-- Web/WASM is not part of v1.
+- Mobile and consoles are not part of the current multi-platform target.

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nima Web Example</title>
+    <link rel="icon" href="data:,">
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: #101217;
+      }
+
+      #canvas {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+        outline: none;
+      }
+
+      #status {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        color: #f5f7fb;
+        font: 600 18px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Loading...</div>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+    <script>
+      const statusNode = document.getElementById("status");
+      const canvas = document.getElementById("canvas");
+
+      function resizeCanvas() {
+        const scale = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.floor(window.innerWidth * scale));
+        const height = Math.max(1, Math.floor(window.innerHeight * scale));
+        canvas.width = width;
+        canvas.height = height;
+        canvas.style.width = window.innerWidth + "px";
+        canvas.style.height = window.innerHeight + "px";
+      }
+
+      function resumeAudio() {
+        const sdl = typeof Module !== "undefined" && (Module.SDL3 || Module.SDL2);
+        if (!sdl) return;
+        for (const key in sdl) {
+          const value = sdl[key];
+          if (value && value.state === "suspended" && value.resume) {
+            value.resume();
+          }
+        }
+      }
+
+      document.addEventListener("click", resumeAudio);
+      document.addEventListener("keydown", resumeAudio);
+      window.addEventListener("resize", resizeCanvas);
+
+      var Module = {
+        canvas,
+        print(text) {
+          console.log(text);
+        },
+        printErr(text) {
+          console.error(text);
+        },
+        setStatus(text) {
+          statusNode.textContent = text || "";
+          statusNode.style.display = text ? "block" : "none";
+        },
+        onRuntimeInitialized() {
+          resizeCanvas();
+          statusNode.style.display = "none";
+          canvas.focus();
+        }
+      };
+
+      Module.setStatus("Downloading...");
+      window.onerror = function() {
+        Module.setStatus("Runtime error. See console.");
+      };
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>

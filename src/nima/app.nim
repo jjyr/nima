@@ -1,5 +1,11 @@
 import ./[assets, engine, facade, math, scene]
 
+when defined(emscripten) and defined(nimaUseSdlGpu):
+  {.fatal: "Nima web builds currently use -d:nimaUseSdl/SDL_Renderer; SDL_GPU web support is not implemented yet.".}
+
+when defined(emscripten) and defined(nimaUseNativeImgui):
+  {.fatal: "Native Dear ImGui is not supported in Nima web builds; use the built-in immediate UI instead.".}
+
 when defined(nimaUseSdl):
   import ./backend/sdlrenderer as sdlbackend
 
