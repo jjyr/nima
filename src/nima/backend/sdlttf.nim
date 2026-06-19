@@ -289,7 +289,6 @@ proc layoutGlyphRun*(state: var SdlTtfState, text: Text): SdlGlyphRun =
     return
 
   result.atlas = atlas
-  let ascent = state.fontAscent(font, text).float32
   let lineSkip = state.fontLineSkip(font, text).float32
   var x = 0'f32
   var y = 0'f32
@@ -315,7 +314,9 @@ proc layoutGlyphRun*(state: var SdlTtfState, text: Text): SdlGlyphRun =
     let glyph = state.ensureGlyph(atlas, font, text, ch)
     if glyph.hasImage:
       let gx = x + glyph.minx
-      let gy = y + ascent - glyph.maxy
+      # SDL3_ttf glyph surfaces already include their vertical baseline padding.
+      # Applying maxy again makes Latin glyphs jump up and down inside a run.
+      let gy = y
       result.glyphs.add SdlGlyphPlacement(
         src: glyph.src,
         dst: rect(vec2(gx, gy),
