@@ -33,7 +33,7 @@ src/
   nima/prelude.nim         Main game-facing import.
   nima/*.nim               Core engine modules.
   nima/backend/            SDL3 renderer, GPU, audio, image, mixer, and TTF.
-  nima/native_imgui/       Optional CImGui/Dear ImGui bridge.
+  nima/native_imgui/       Optional native CImGui/Dear ImGui bridge.
 tests/
   *.nim                    Unit and backend smoke tests.
 tools/
@@ -73,9 +73,14 @@ primitives. Vulkan and Direct3D 12 shader packaging are planned through
 Native Dear ImGui is opt-in:
 
 ```sh
+nimble submodules
 nim c -d:nimaUseSdl -d:nimaUseNativeImgui -r examples/native_imgui_demo.nim
 nim c -d:nimaUseSdlGpu -d:nimaUseNativeImgui -r examples/native_imgui_demo.nim
 ```
+
+`nimble submodules` initializes git submodules. Native Dear ImGui uses the CImGui
+submodule at `src/nima/native_imgui/private/cimgui`; the nested Dear ImGui
+submodule must also be present.
 
 ## SDL3 Setup
 
@@ -133,6 +138,7 @@ Batch build examples:
 nimble examples
 nimble sdlExamples
 nimble sdlGpuExamples
+nimble submodules
 nimble nativeImguiSmoke
 ```
 

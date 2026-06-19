@@ -84,9 +84,19 @@ Current examples:
 
 Nima also ships an opt-in native bridge behind `-d:nimaUseNativeImgui`.
 
-The bridge vendors CImGui/Dear ImGui under
-`src/nima/native_imgui/private/cimgui`, compiles the SDL3 platform backend, and
-uses the matching renderer backend:
+The bridge uses CImGui as a git submodule under
+`src/nima/native_imgui/private/cimgui`. That submodule contains its own Dear
+ImGui submodule, so native ImGui builds require recursive submodule
+initialization:
+
+```sh
+nimble submodules
+# or:
+git submodule update --init --recursive
+```
+
+The bridge compiles the SDL3 platform backend and uses the matching renderer
+backend:
 
 - `-d:nimaUseSdl -d:nimaUseNativeImgui`: SDL3 platform backend plus
   `imgui_impl_sdlrenderer3`.
@@ -122,6 +132,7 @@ method cleanup(scene: MyScene) =
 Build:
 
 ```sh
+nimble submodules
 nim c -d:nimaUseSdl -d:nimaUseNativeImgui examples/native_imgui_demo.nim
 nim c -d:nimaUseSdlGpu -d:nimaUseNativeImgui examples/native_imgui_demo.nim
 ```
@@ -202,8 +213,8 @@ The first native bridge is in place. Remaining production work:
 2. Validate clipboard and keyboard/gamepad navigation behavior on each desktop
    backend.
 3. Add runtime validation on Linux/Vulkan and Windows/D3D12.
-4. Decide whether CImGui remains vendored source or becomes a managed
-   submodule/package.
+4. Define an update policy for the pinned CImGui submodule and generated Nim
+   wrapper surface.
 
 The pure immediate layer remains useful for small debug overlays and headless
 tests. Raw Dear ImGui symbols stay out of `nima/prelude`; native code is

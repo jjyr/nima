@@ -33,10 +33,10 @@ Implemented now:
   bootstrap path.
 - SDL core WAV playback bridge for `AudioState` through `SDL_AudioStream`, with
   optional SDL3_mixer dynamic loading for non-WAV clips.
-- Optional native Dear ImGui bridge gated by `-d:nimaUseNativeImgui`, using
-  vendored CImGui/Dear ImGui, SDL3 event processing, `imgui_impl_sdlrenderer3`
-  for the SDL_Renderer backend, and `imgui_impl_sdlgpu3` for the SDL_GPU
-  backend.
+- Optional native Dear ImGui bridge gated by `-d:nimaUseNativeImgui`, using a
+  pinned CImGui git submodule, SDL3 event processing,
+  `imgui_impl_sdlrenderer3` for the SDL_Renderer backend, and
+  `imgui_impl_sdlgpu3` for the SDL_GPU backend.
 - Window close, resize, keyboard, mouse button, mouse motion, mouse wheel, and
   text-input, gamepad hotplug/button/axis event handling.
 - Logical presentation mapping for fixed view size, fit, fill, stretch, and

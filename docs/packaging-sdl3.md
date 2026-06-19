@@ -29,9 +29,10 @@ Local validation state:
   present. Missing add-ons do not break startup: text falls back to SDL debug
   text, image loading falls back to `stb_image`, and audio keeps the SDL core
   WAV path.
-- Native Dear ImGui is opt-in through `-d:nimaUseNativeImgui`. It vendors
-  CImGui/Dear ImGui source and compiles C++ into the game executable; it does
-  not add a separate Dear ImGui runtime library.
+- Native Dear ImGui is opt-in through `-d:nimaUseNativeImgui`. It uses the
+  CImGui git submodule at `src/nima/native_imgui/private/cimgui` and compiles
+  C++ into the game executable; it does not add a separate Dear ImGui runtime
+  library.
 - Web examples build with Emscripten and a separately built SDL3 static
   library. The local `nimble webExamples` check emits 18 web bundles; `hotreload`
   is excluded from web by design.
@@ -89,7 +90,7 @@ Native Dear ImGui build requirements:
 
 ```text
 pkg-config sdl3      -> SDL3 C flags/libs for Dear ImGui SDL backends
-C++ compiler/linker  -> compiles vendored Dear ImGui/CImGui sources
+C++ compiler/linker  -> compiles CImGui/Dear ImGui submodule sources
 ```
 
 Example:
@@ -173,7 +174,15 @@ else:
 ```
 
 When `-d:nimaUseNativeImgui` is used, keep the C++ linker setting. The bridge
-compiles C++ sources from `src/nima/native_imgui/private/cimgui`.
+compiles C++ sources from the CImGui submodule at
+`src/nima/native_imgui/private/cimgui`, including its nested Dear ImGui
+submodule. Initialize it before native ImGui builds:
+
+```sh
+nimble submodules
+# or:
+git submodule update --init --recursive
+```
 
 If SDL3 is installed in a custom location, user config can add include and link
 paths:

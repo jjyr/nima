@@ -38,7 +38,7 @@ separate web pass.
 Define                 Meaning
 nimaUseSdl             Use SDL3 + SDL_Renderer backend
 nimaUseSdlGpu          Use SDL3 + SDL_GPU backend
-nimaUseNativeImgui     Compile vendored CImGui/Dear ImGui bridge
+nimaUseNativeImgui     Compile CImGui/Dear ImGui submodule bridge
 emscripten             Use Emscripten web target; config.nims also enables nimaUseSdl
 nimaWindowsConsole     Keep Windows console subsystem instead of -mwindows
 ```

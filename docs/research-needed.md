@@ -72,10 +72,11 @@ This file tracks facts still needed before or during implementation.
   GPU batching details are still missing.
 - Native Dear ImGui is implemented as an opt-in CImGui/Dear ImGui bridge
   behind `-d:nimaUseNativeImgui`, with SDL_Renderer and SDL_GPU backend
-  compile smokes and a `native_imgui_demo` example. The typed helper surface now
-  covers common windows, widgets, menus, tabs, tables, popups, tooltips,
-  disabled scopes, indentation, clipboard access, and keyboard/gamepad
-  navigation toggles.
+  compile smokes and a `native_imgui_demo` example. CImGui is pinned as a git
+  submodule at `src/nima/native_imgui/private/cimgui`, with Dear ImGui pulled
+  recursively by that submodule. The typed helper surface now covers common
+  windows, widgets, menus, tabs, tables, popups, tooltips, disabled scopes,
+  indentation, clipboard access, and keyboard/gamepad navigation toggles.
 - Roast2D-shaped `map` and deterministic `tween` modules are implemented.
   `breakout` uses tweened camera shake. Prefab loading accepts JSON and
   RON-like tag/size/color templates plus patch operations for common Roast2D
@@ -171,9 +172,8 @@ This file tracks facts still needed before or during implementation.
 - Decide whether to expose audio format capability queries in the public API.
   The backend now has SDL core WAV plus optional SDL3_mixer dynamic playback,
   but game code cannot yet ask which formats are supported.
-- Decide whether the current vendored CImGui bridge should remain local,
-  become a submodule, or be replaced by a managed Nim ImGui package after SDL
-  GPU backend coverage is stronger.
+- Define a CImGui submodule update policy: target branch/tag, when generated
+  wrappers are refreshed, and how SDL backend API changes are validated.
 - Decide whether atlas should keep JSON as the Nim-native authoring format or
   add full Aseprite/Roast2D imported package compatibility. Prefab now supports
   JSON and a pragmatic RON-like field subset; full RON schema parity remains a

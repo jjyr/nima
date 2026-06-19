@@ -39,6 +39,10 @@ proc requireCommand(name: string) =
   if findExe(name).len == 0:
     quit "Required command not found: " & name, 1
 
+task submodules, "Initialize git submodules needed by optional native integrations":
+  requireCommand("git")
+  exec "git submodule update --init --recursive"
+
 proc platformToolCommand(target, examples: string, extra = ""): string =
   result = "nim r --nimcache:nimcache/platform_examples_tool tools/platform_examples.nim -- --target:" &
     target & " --example:" & examples
