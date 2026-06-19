@@ -1,6 +1,6 @@
 version       = "0.1.0"
 author        = "TBD"
-description   = "A Nim-native 2D game engine inspired by Roast2D"
+description   = "A Nim-native 2D game engine"
 license       = "MIT"
 srcDir        = "src"
 

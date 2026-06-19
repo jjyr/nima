@@ -1,3 +1,4 @@
+import std/[sequtils, strutils, unicode]
 import ./[color, draw, facade, math, transform]
 
 type
@@ -173,7 +174,121 @@ proc labelPoint(bounds: UiRect, align: ContentAlign): tuple[pos, anchor: Vec2] =
   of caBottomRight:
     (vec2(bounds.max.x, bounds.min.y), vec2(1, 0))
 
+proc runeWidth(rune: Rune, size: float32): float32 =
+  let code = int32(rune)
+  if code == 9:
+    size * 1.2'f32
+  elif code == 32:
+    size * 0.35'f32
+  elif code >= 0x2E80:
+    size
+  else:
+    size * 0.58'f32
+
+proc textWidth(content: string, size: float32): float32 =
+  for rune in content.runes:
+    result += rune.runeWidth(size)
+
+proc pushWrappedLine(lines: var seq[string], line: var string) =
+  lines.add line.strip()
+  line.setLen 0
+
+proc breakLongToken(lines: var seq[string], token: string,
+                    maxWidth, size: float32) =
+  var line = ""
+  var width = 0'f32
+  for rune in token.runes:
+    let rw = rune.runeWidth(size)
+    if line.len > 0 and width + rw > maxWidth:
+      lines.add line
+      line.setLen 0
+      width = 0
+    line.add $rune
+    width += rw
+  if line.len > 0:
+    lines.add line
+
+proc wrapText(content: string, maxWidth, size: float32): seq[string] =
+  if maxWidth <= 0'f32:
+    return
+  for paragraph in content.splitLines():
+    if paragraph.len == 0:
+      result.add ""
+      continue
+    var line = ""
+    for token in strutils.splitWhitespace(paragraph):
+      if token.textWidth(size) > maxWidth:
+        if line.len > 0:
+          result.pushWrappedLine(line)
+        result.breakLongToken(token, maxWidth, size)
+        continue
+      let candidate = if line.len == 0: token else: line & " " & token
+      if candidate.textWidth(size) <= maxWidth:
+        line = candidate
+      else:
+        result.pushWrappedLine(line)
+        line = token
+    if line.len > 0:
+      result.pushWrappedLine(line)
+
+proc fitEllipsis(line: string, maxWidth, size: float32): string =
+  const suffix = "..."
+  if suffix.textWidth(size) > maxWidth:
+    return ""
+  result = line.strip(chars = {' ', '.'})
+  while result.len > 0 and (result & suffix).textWidth(size) > maxWidth:
+    let runes = result.runes.toSeq()
+    if runes.len <= 1:
+      result.setLen 0
+      break
+    result.setLen(0)
+    for i in 0 ..< runes.len - 1:
+      result.add $runes[i]
+    result = result.strip()
+  result.add suffix
+
+proc horizontalAnchor(align: ContentAlign): tuple[x: float32, anchorX: float32] =
+  case align
+  of caTopRight, caRight, caBottomRight:
+    (1'f32, 1'f32)
+  of caTop, caCenter, caBottom:
+    (0.5'f32, 0.5'f32)
+  else:
+    (0'f32, 0'f32)
+
+proc verticalMode(align: ContentAlign): float32 =
+  case align
+  of caBottomLeft, caBottom, caBottomRight:
+    0'f32
+  of caLeft, caCenter, caRight:
+    0.5'f32
+  else:
+    1'f32
+
 proc draw*(label: Label, z = 0'f32) =
-  let p = labelPoint(label.bounds, label.style.align)
-  drawText(text(label.content, label.style.size, label.style.color),
-           transform(p.pos.extend(z)), p.anchor)
+  let lineHeight = max(1'f32, label.style.size * 1.18'f32)
+  let maxLines = max(1, int(label.bounds.size.y / lineHeight))
+  var lines = wrapText(label.content, label.bounds.size.x, label.style.size)
+  if lines.len == 0:
+    return
+  if lines.len > maxLines:
+    lines.setLen(maxLines)
+    lines[maxLines - 1] = fitEllipsis(lines[maxLines - 1], label.bounds.size.x,
+                                      label.style.size)
+
+  let totalHeight = lineHeight * lines.len.float32
+  let h = label.style.align.horizontalAnchor()
+  let x = label.bounds.min.x + label.bounds.size.x * h.x
+  let v = label.style.align.verticalMode()
+  let topY =
+    if v == 1'f32:
+      label.bounds.max.y
+    elif v == 0'f32:
+      label.bounds.min.y + totalHeight
+    else:
+      label.bounds.center.y + totalHeight * 0.5'f32
+
+  for i, line in lines:
+    let y = topY - i.float32 * lineHeight
+    drawText(text(line, label.style.size, label.style.color),
+             transform(vec3(x, y, z)), vec2(h.anchorX, 1))
