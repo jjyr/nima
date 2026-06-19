@@ -81,6 +81,9 @@ nimble webExamples
 python3 -m http.server 8000 -d build/web/breakout
 ```
 
+See `docs/web-platform.md` for the full web guide, including user-project
+`config.nims`, asset packaging, and hosting rules.
+
 Output:
 
 ```text

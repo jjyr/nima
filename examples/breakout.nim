@@ -7,6 +7,8 @@ const
   BallRadius = 11'f32
   BrickSize = vec2(64, 26)
   PaddleY = -260'f32
+  WallInset = 18'f32
+  BallGravity = vec2(0, 85'f32)
 
 type
   Action = enum
@@ -62,6 +64,11 @@ proc brickColor(row: int): Color =
   of 3: rgb(0.33, 0.72, 0.46)
   else: rgb(0.28, 0.55, 0.95)
 
+proc arenaLeft(): float32 = -View.x * 0.5'f32 + WallInset
+proc arenaRight(): float32 = View.x * 0.5'f32 - WallInset
+proc arenaBottom(): float32 = -View.y * 0.5'f32 + WallInset
+proc arenaTop(): float32 = View.y * 0.5'f32 - WallInset
+
 proc spawnBrickDebris(scene: Breakout, brick: Brick) =
   for i in 0..<10:
     let angle = (i.float32 / 10'f32) * stdmath.PI.float32 * 2'f32 +
@@ -111,17 +118,18 @@ method update(scene: Breakout) =
   if scene.serveTimer > 0:
     scene.serveTimer -= tick()
 
+  scene.ballVel = scene.ballVel + BallGravity * tick()
   scene.ballPos = scene.ballPos + scene.ballVel * tick()
-  if scene.ballPos.x - BallRadius < -View.x * 0.5'f32:
-    scene.ballPos.x = -View.x * 0.5'f32 + BallRadius
+  if scene.ballPos.x - BallRadius < arenaLeft():
+    scene.ballPos.x = arenaLeft() + BallRadius
     scene.ballVel.x = abs(scene.ballVel.x)
-  elif scene.ballPos.x + BallRadius > View.x * 0.5'f32:
-    scene.ballPos.x = View.x * 0.5'f32 - BallRadius
+  elif scene.ballPos.x + BallRadius > arenaRight():
+    scene.ballPos.x = arenaRight() - BallRadius
     scene.ballVel.x = -scene.ballVel.x
-  if scene.ballPos.y + BallRadius > View.y * 0.5'f32:
-    scene.ballPos.y = View.y * 0.5'f32 - BallRadius
+  if scene.ballPos.y + BallRadius > arenaTop():
+    scene.ballPos.y = arenaTop() - BallRadius
     scene.ballVel.y = -scene.ballVel.y
-  if scene.ballPos.y + BallRadius < -View.y * 0.5'f32:
+  if scene.ballPos.y + BallRadius < arenaBottom():
     inc scene.failures
     let reset = scene.cameraShake.reset(transform(cameraPos().extend(0)))
     setCameraPos(reset.pos.xy)
@@ -131,7 +139,7 @@ method update(scene: Breakout) =
       vec2(scene.paddleX, PaddleY), PaddleSize):
     let hit = ((scene.ballPos.x - scene.paddleX) / (PaddleSize.x * 0.5'f32)).clamp(-1, 1)
     let speed = max(260'f32, scene.ballVel.length + 8'f32)
-    scene.ballVel = vec2(hit * 245'f32, 1'f32).normalized * speed
+    scene.ballVel = vec2(hit * 0.85'f32, 1'f32).normalized * speed
     scene.ballPos.y = PaddleY + PaddleSize.y * 0.5'f32 + BallRadius + 1
     scene.cameraShake.addShake(3, 0.16, 40, seed = (frame().uint32 + 17'u32))
 
@@ -159,14 +167,14 @@ method draw(scene: Breakout) =
   drawRect(rgb(0.025, 0.032, 0.05), viewSize(), transform(vec3(0, 0, -1)))
   drawRect(rgba(0.10, 0.14, 0.22, 0.9), vec2(View.x - 36, View.y - 34),
            transform(vec3(0, 4, -0.8)))
-  drawLine(vec2(-View.x * 0.5'f32 + 18, -View.y * 0.5'f32 + 18),
-           vec2(-View.x * 0.5'f32 + 18, View.y * 0.5'f32 - 18), 3,
+  drawLine(vec2(arenaLeft(), arenaBottom()),
+           vec2(arenaLeft(), arenaTop()), 3,
            rgba(0.24, 0.36, 0.62, 1), -0.4)
-  drawLine(vec2(View.x * 0.5'f32 - 18, -View.y * 0.5'f32 + 18),
-           vec2(View.x * 0.5'f32 - 18, View.y * 0.5'f32 - 18), 3,
+  drawLine(vec2(arenaRight(), arenaBottom()),
+           vec2(arenaRight(), arenaTop()), 3,
            rgba(0.24, 0.36, 0.62, 1), -0.4)
-  drawLine(vec2(-View.x * 0.5'f32 + 18, View.y * 0.5'f32 - 18),
-           vec2(View.x * 0.5'f32 - 18, View.y * 0.5'f32 - 18), 3,
+  drawLine(vec2(arenaLeft(), arenaTop()),
+           vec2(arenaRight(), arenaTop()), 3,
            rgba(0.24, 0.36, 0.62, 1), -0.4)
 
   drawRect(rgba(0.06, 0.07, 0.09, 0.85), PaddleSize + vec2(10, 8),

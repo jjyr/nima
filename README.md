@@ -25,6 +25,7 @@ assets/
 docs/
   *.md                     Design notes for SDL3, packaging, cross-platform,
                            ImGui, hot reload, and API specs.
+  web-platform.md          Web build, hosting, and user-project setup guide.
 examples/
   *.nim                    Runnable gameplay, rendering, UI, and ImGui examples.
 src/
