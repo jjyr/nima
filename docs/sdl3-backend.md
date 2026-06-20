@@ -12,15 +12,15 @@ cross-platform GPU abstraction over Metal, Vulkan, and Direct3D 12.
 
 ## Current Implementation Status
 
-The current repository has a verified headless core and an SDL3 runtime path
-gated by `-d:nimaUseSdl`.
+The current repository has a verified headless core, an SDL_Renderer fallback
+gated by `-d:nimaUseSdl`, and SDL_GPU as the default desktop runtime path.
 
 Implemented now:
 
 - SDL3 initialization and shutdown.
 - SDL3 window creation with high-DPI support.
 - SDL_Renderer bootstrap renderer.
-- SDL_GPU backend scaffold gated by `-d:nimaUseSdlGpu`: device creation,
+- SDL_GPU backend: device creation,
   window claim/release, swapchain acquisition, clear pass, MSL shader pipelines
   for solid quads, textured sprite quads, thick line meshes, filled circles,
   filled regular polygons, and polygon outlines on Metal, stb-decoded texture
@@ -63,7 +63,7 @@ Implemented now:
 - Full example compile pass through `nimble sdlExamples` and
   `nimble sdlGpuExamples`.
 
-SDL_GPU now has the first native runtime path and a Metal/MSL shader path for
+SDL_GPU now has the default native runtime path and a Metal/MSL shader path for
 core 2D primitives. It is still not production-complete:
 shadercross-built SPIR-V/DXIL, broader batched buffers, render textures/post
 passes, and runtime validation of native ImGui on Linux/Vulkan and

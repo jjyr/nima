@@ -10,8 +10,8 @@ requires "stb_image >= 2.5"
 
 import std/os
 
-task test, "Run unit tests":
-  exec "nim c -r tests/all.nim"
+task test, "Run headless unit tests":
+  exec "nim c -d:nimaHeadless -r tests/all.nim"
 
 const exampleNames = [
   "window_smoke",
@@ -49,9 +49,13 @@ proc platformToolCommand(target, examples: string, extra = ""): string =
   if extra.len > 0:
     result.add " " & extra
 
-task examples, "Build representative examples":
+task examples, "Build representative examples with the default backend":
   for name in exampleNames:
     exec "nim c --nimcache:nimcache/examples_" & name & " examples/" & name & ".nim"
+
+task headlessExamples, "Build representative examples in headless mode":
+  for name in exampleNames:
+    exec "nim c --nimcache:nimcache/headless_" & name & " -d:nimaHeadless examples/" & name & ".nim"
 
 task sdlExamples, "Build representative examples with SDL backend":
   for name in exampleNames:
@@ -90,7 +94,7 @@ task linuxExamples, "Build Linux examples on a Linux host":
   exec platformToolCommand("linux", "all", "--package")
 
 task platformExamples, "Build examples for NIMA_TARGET=headless|sdl|sdlgpu|web|windows|linux and optional NIMA_EXAMPLE":
-  let target = getEnv("NIMA_TARGET", "headless")
+  let target = getEnv("NIMA_TARGET", "sdlgpu")
   let examples = getEnv("NIMA_EXAMPLE", "all")
   exec platformToolCommand(target, examples, getEnv("NIMA_PLATFORM_ARGS"))
 
@@ -114,7 +118,7 @@ task hotreloadSmoke, "Build hot reload library and run headless smoke":
     exec "nim c --nimcache:nimcache/hotreload_lib --app:lib --out:examples/hotreload_game.dll examples/hotreload_game.nim"
   else:
     exec "nim c --nimcache:nimcache/hotreload_lib --app:lib --out:examples/libhotreload_game.so examples/hotreload_game.nim"
-  exec "nim c --nimcache:nimcache/hotreload_smoke -r tests/hotreload_smoke.nim"
+  exec "nim c --nimcache:nimcache/hotreload_smoke -d:nimaHeadless -r tests/hotreload_smoke.nim"
 
 task shaders, "Compile built-in shaders":
   exec "nim c --nimcache:nimcache/shaders -r tools/compile_shaders.nim"

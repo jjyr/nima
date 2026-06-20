@@ -259,7 +259,7 @@ proc buildCommand(target: Target, name, outRoot: string, run: bool): string =
   case target
   of tHeadless:
     let runFlag = if run: " -r" else: ""
-    &"nim c{runFlag} --nimcache:nimcache/platform_headless_{name} examples/{name}.nim"
+    &"nim c{runFlag} --nimcache:nimcache/platform_headless_{name} -d:nimaHeadless examples/{name}.nim"
   of tSdl:
     let runFlag = if run: " -r" else: ""
     &"nim c{runFlag} --nimcache:nimcache/platform_sdl_{name} -d:nimaUseSdl examples/{name}.nim"
@@ -313,7 +313,7 @@ Targets:
 
 when isMainModule:
   var
-    target = tHeadless
+    target = tSdlGpu
     examplesArg = "all"
     outRoot = "build"
     run = false

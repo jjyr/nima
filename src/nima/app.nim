@@ -1,5 +1,8 @@
 import ./[assets, engine, facade, math, scene]
 
+when defined(nimaHeadless) and (defined(nimaUseSdl) or defined(nimaUseSdlGpu)):
+  {.fatal: "nimaHeadless cannot be combined with SDL backend defines".}
+
 when defined(emscripten) and defined(nimaUseSdlGpu):
   {.fatal: "Nima web builds currently use -d:nimaUseSdl/SDL_Renderer; SDL_GPU web support is not implemented yet.".}
 

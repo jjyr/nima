@@ -14,6 +14,8 @@ Local validation state:
 - `pkg-config --modversion sdl3` returns `3.4.10`.
 - `config.nims` adds Homebrew library paths and rpaths for macOS so the
   `pkg/sdl3` dynlib loader can find `libSDL3.dylib`.
+- `config.nims` enables SDL_GPU by default for desktop builds unless
+  `nimaHeadless` or another backend define is passed.
 - `tests/sdl_smoke.nim` runs under `SDL_VIDEODRIVER=dummy` and exits after one
   frame.
 - `tests/sdl_gpu_smoke.nim`, `tests/sdl_gpu_sprite_smoke.nim`, and
@@ -371,7 +373,9 @@ Development:
 
 ```sh
 nimble install -y
+nim c -r examples/breakout.nim
 nim c -d:nimaUseSdl -r examples/breakout.nim
+nim c -d:nimaHeadless -r examples/breakout.nim
 ```
 
 Release:
@@ -419,6 +423,7 @@ compiled shader blobs instead of needing the shader compiler.
 
 ```sh
 nimble examples
+nimble headlessExamples
 nimble sdlExamples
 nimble sdlGpuExamples
 NIMA_EXAMPLE=breakout nimble webExample

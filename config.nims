@@ -23,6 +23,10 @@ when defined(emscripten):
     switch("passC", "-I" & prefix / "include")
     switch("passL", prefix / "lib" / "libSDL3.a")
 
+when not defined(emscripten) and not defined(nimaHeadless) and
+    not defined(nimaUseSdl) and not defined(nimaUseSdlGpu):
+  switch("define", "nimaUseSdlGpu")
+
 when defined(Windows):
   switch("passL", "-static")
   switch("passL", "-static-libstdc++ -static-libgcc")

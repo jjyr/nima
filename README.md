@@ -52,23 +52,23 @@ Nima has these main build modes:
 nim c -r examples/breakout.nim
 ```
 
-Headless/default mode. Useful for tests and compile checks. It records draw
-commands but does not open an SDL window.
+Default desktop mode. `config.nims` enables SDL_GPU unless another backend or
+`nimaHeadless` is explicitly defined. On macOS it uses Metal with embedded MSL
+shaders for core 2D primitives. Vulkan and Direct3D 12 shader packaging are
+planned through `tools/compile_shaders.nim` and SDL_shadercross.
 
 ```sh
 nim c -d:nimaUseSdl -r examples/breakout.nim
 ```
 
-SDL_Renderer backend. This is the simplest runtime path and the recommended
-first backend when trying examples.
+SDL_Renderer backend. This is the bootstrap/fallback runtime path.
 
 ```sh
-nim c -d:nimaUseSdlGpu -r examples/breakout.nim
+nim c -d:nimaHeadless -r examples/breakout.nim
 ```
 
-SDL_GPU backend. On macOS it uses Metal with embedded MSL shaders for core 2D
-primitives. Vulkan and Direct3D 12 shader packaging are planned through
-`tools/compile_shaders.nim` and SDL_shadercross.
+Headless mode. Useful for tests and compile checks. It records draw commands
+but does not open an SDL window.
 
 Native Dear ImGui is opt-in:
 
@@ -111,31 +111,32 @@ cd <repo-path>
 Run a small smoke window:
 
 ```sh
-nim c -d:nimaUseSdl -r examples/window_smoke.nim
+nim c -r examples/window_smoke.nim
 ```
 
 Run gameplay and rendering examples:
 
 ```sh
+nim c -r examples/breakout.nim
+nim c -r examples/shapes.nim
+nim c -r examples/ui_layout.nim
+nim c -r examples/imgui_showcase.nim
+nim c -r examples/imgui_cjk.nim
+```
+
+Run the same examples through SDL_Renderer:
+
+```sh
 nim c -d:nimaUseSdl -r examples/breakout.nim
 nim c -d:nimaUseSdl -r examples/shapes.nim
 nim c -d:nimaUseSdl -r examples/ui_layout.nim
-nim c -d:nimaUseSdl -r examples/imgui_showcase.nim
-nim c -d:nimaUseSdl -r examples/imgui_cjk.nim
-```
-
-Run the same examples through SDL_GPU:
-
-```sh
-nim c -d:nimaUseSdlGpu -r examples/breakout.nim
-nim c -d:nimaUseSdlGpu -r examples/shapes.nim
-nim c -d:nimaUseSdlGpu -r examples/ui_layout.nim
 ```
 
 Batch build examples:
 
 ```sh
 nimble examples
+nimble headlessExamples
 nimble sdlExamples
 nimble sdlGpuExamples
 nimble submodules
@@ -186,7 +187,7 @@ platform architecture by default.
 Run tests:
 
 ```sh
-nim c --nimcache:nimcache/test -r tests/all.nim
+nim c --nimcache:nimcache/test -d:nimaHeadless -r tests/all.nim
 SDL_VIDEODRIVER=dummy nim c --nimcache:nimcache/sdl_smoke -d:nimaUseSdl -r tests/sdl_smoke.nim
 ```
 

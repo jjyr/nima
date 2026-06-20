@@ -19,7 +19,7 @@ Headless     None                  Draw recorder       Implemented, locally veri
 ```
 
 SDL_Renderer is the portable bootstrap backend. SDL_GPU is the production
-desktop direction for Metal, Vulkan, and Direct3D 12. Web currently uses
+desktop default for Metal, Vulkan, and Direct3D 12. Web currently uses
 SDL_Renderer through Emscripten because SDL_GPU shader/package support needs a
 separate web pass.
 
@@ -37,7 +37,8 @@ separate web pass.
 ```text
 Define                 Meaning
 nimaUseSdl             Use SDL3 + SDL_Renderer backend
-nimaUseSdlGpu          Use SDL3 + SDL_GPU backend
+nimaUseSdlGpu          Use SDL3 + SDL_GPU backend; default on desktop when no backend define is passed
+nimaHeadless           Disable SDL backends and use the draw-recorder headless path
 nimaUseNativeImgui     Compile CImGui/Dear ImGui submodule bridge
 emscripten             Use Emscripten web target; config.nims also enables nimaUseSdl
 nimaWindowsConsole     Keep Windows console subsystem instead of -mwindows
@@ -50,11 +51,19 @@ Invalid web combinations fail at compile time:
 
 ## Example Commands
 
-Headless compile/run:
+Default desktop SDL_GPU:
 
 ```sh
 nim c -r examples/breakout.nim
 nimble examples
+```
+
+Headless compile/run:
+
+```sh
+nim c -d:nimaHeadless -r examples/breakout.nim
+nimble headlessExamples
+NIMA_TARGET=headless nimble platformExamples
 ```
 
 Desktop SDL_Renderer:
@@ -169,9 +178,11 @@ Web:
   `SDL3_EMSCRIPTEN_PREFIX=<prefix>` where `<prefix>/lib/libSDL3.a` exists.
 - `nimble sdl3Emscripten` can build SDL3 from `libsdl-org/SDL` into
   `build/sdl3-emscripten-prefix`.
-- `config.nims` maps `-d:emscripten` to `emcc`, enables `nimaUseSdl`, disables
-  Nim threads for normal static hosting, attaches `tools/web_shell.html`, links
-  the SDL3 static library, and preloads `assets@/assets`.
+- `config.nims` enables `nimaUseSdlGpu` by default for desktop builds unless
+  `nimaHeadless`, `nimaUseSdl`, or `nimaUseSdlGpu` is explicitly defined. It
+  maps `-d:emscripten` to `emcc`, enables `nimaUseSdl`, disables Nim threads
+  for normal static hosting, attaches `tools/web_shell.html`, links the SDL3
+  static library, and preloads `assets@/assets`.
 - `tools/platform_examples.nim` creates a repo-local Emscripten LLVM shim when
   Homebrew provides `clang` and `wasm-ld` in different directories.
 - `tools/web_shell.html` owns canvas sizing and browser audio unlock.
@@ -193,7 +204,7 @@ is `assets`.
 
 Verified locally on macOS:
 
-- `nim c --nimcache:nimcache/platform_tests_final -r tests/all.nim`
+- `nim c --nimcache:nimcache/platform_tests_final -d:nimaHeadless -r tests/all.nim`
 - `nim c --nimcache:nimcache/platform_check_sdl_final -d:nimaUseSdl examples/window_smoke.nim`
 - `nim c --nimcache:nimcache/platform_check_gpu_final -d:nimaUseSdlGpu tests/sdl_gpu_smoke.nim`
 - `HOME=/private/tmp/nimble-home nimble webExamples`
